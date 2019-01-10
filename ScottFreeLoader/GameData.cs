@@ -12,18 +12,15 @@ namespace ScottFreeLoader
     public partial class GameData
     {
 
-        private static string _ObviousExits = "Obvious exits: "; //5
-        private static string _None = "none.\r\n";
-
         public GameHeader Header;
         public GameFooter Footer;
         public Room[] Rooms = null;
         public Action[] Actions = null;
+        public Item[] Items = null;
         public string[] Verbs = null;
         public string[] Nouns = null;
         public string[] Messages = null;
         public string GameName = null;
-        public int TurnCounter { get; set; }
 
         private string CurrentFolder
         {
@@ -37,116 +34,16 @@ namespace ScottFreeLoader
 
         public GameData()
         {
-            TakeSuccessful = false;
-            BitFlags = new bool[32];
-            Counters = new int[32];
-            SavedRooms = new int[32];
-            PlayerNoun = null;
-            EndGame = false;
+
         }
 
-        /// <summary>
-        /// Save the current game
-        /// </summary>
-        /// <param name="pSaveName">Filename to save to</param>
-        /// <param name="pSave">GameData class to extract save data</param>
-        public string SaveSnapshot()
-        {
-            string gameRoot = GameName.Substring(0, GameName.IndexOf("."));
-            int saves = Directory.GetFiles(CurrentFolder, gameRoot + "_*.sav").Length + 1;
-            string sg;
-            using (StreamWriter sw = new StreamWriter((sg = string.Format("{0}_{1}.sav", gameRoot, saves))))
-            {
-                //write header
-                sw.WriteLine(string.Format("\"{0}\"", this.GameName));
-                sw.WriteLine(this.Items.Count(i => i.Moved()) + "/*Moved items*/");
-                sw.WriteLine(this.BitFlags.Count() + "/*Bit flag count*/");
-                sw.WriteLine(this.Counters.Count() + "/*Counters count*/");
-                sw.WriteLine(this.SavedRooms.Count() + "/*Saved rooms count*/");
-
-
-                //get all the changed items
-                this.Items.Select((item, indx) => new { item, indx })
-                    .Where(i => i.item.Moved())
-                    .All(i => { sw.WriteLine(i.indx  + "/*item index*/"); sw.WriteLine(i.item.Location + "/*Item location*/"); return true; });
-
-                this.BitFlags.Select((bf, indx) => new { bf, indx })
-                    .All(i => { sw.WriteLine(i.indx + "/*bitflag index*/"); sw.WriteLine((i.bf ? 1 : 0) + "/*bit flag value*/"); return true; });
-
-                this.Counters.Select((ct, indx) => new { ct, indx })
-                    .All(i => { sw.WriteLine(i.indx + "/*counter index*/"); sw.WriteLine(i.ct + "/*counter value*/"); return true; });
-
-                this.SavedRooms.Select((sr, indx) => new { sr, indx })
-                    .All(i => { sw.WriteLine(i.indx + "/*saved room index*/"); sw.WriteLine(i.sr + "/*saved room*/"); return true; });
-
-
-                sw.WriteLine(this.CurrentRoom + "/*Saved rooms count*/");
-                sw.WriteLine("{0} {1}", this.TakeSuccessful ? 1 : 0, "/*take successful*/");
-                sw.WriteLine(this.CurrentCounter + "/*current counter*/");
-                sw.WriteLine(this.LampLife + "/*lamp life*/");
-                sw.WriteLine(this.PlayerNoun + "/*player noun*/");
-                sw.WriteLine(this.SavedRoom + "/*saved room*/");
-                sw.WriteLine(this.TurnCounter + "/*turn counter*/");
-
-            }
-
-            return sg;
-        }
+      
 
         #endregion
 
         #region public static methods
 
-        /// <summary>
-        /// Load the provided snap shot
-        /// </summary>
-        /// <param name="pSaveName">Snapshot to load</param>
-        /// <returns>GameData class</returns>
-        public static GameData LoadSnapShot(string pAdvGame, string pSnapShot)
-        {
-
-            GameData gd = Load(pAdvGame);
-
-            DATToChunks.Load(pSnapShot);
-            DATToChunks.getTokens(1);//skip the first line. 
-
-            int[] header = DATToChunks.GetTokensAsInt(4);
-
-            //header[0] = changed items - multiply number by two as they are in pairs of index id and new location
-            //header[1] = bitflags  - pairs index, value
-            //header[2] = counters - pairs index, value
-            //header[3] = saved rooms - pairs index, value
-
-            //get header
-            int[] intarray = DATToChunks.GetTokensAsInt(header[0] * 2);
-            for (int i = 0; i < intarray.Length; i += 2)
-                gd.Items[intarray[i]].Location = intarray[i + 1];
-
-            //bit glags
-            intarray = DATToChunks.GetTokensAsInt(header[1] * 2);
-            for (int i = 0; i < intarray.Length; i += 2)
-                gd.BitFlags[intarray[i]] = intarray[i + 1] == 1;
-
-            intarray = DATToChunks.GetTokensAsInt(header[2] * 2);
-            for (int i = 0; i < intarray.Length; i += 2)
-                gd.Counters[intarray[i]] = intarray[i + 1];
-
-            intarray = DATToChunks.GetTokensAsInt(header[3] * 2);
-            for (int i = 0; i < intarray.Length; i += 2)
-                gd.SavedRooms[intarray[i]] = intarray[i + 1];
-
-            gd.CurrentRoom = DATToChunks.GetTokensAsInt(1).First();
-            gd.TakeSuccessful = DATToChunks.GetTokensAsInt(1).First() == 1;
-            gd.CurrentCounter = DATToChunks.GetTokensAsInt(1).First();
-            gd.LampLife = DATToChunks.GetTokensAsInt(1).First();
-            gd.PlayerNoun = DATToChunks.getTokens(1).First();
-            gd.SavedRoom = DATToChunks.GetTokensAsInt(1).First();
-            gd.TurnCounter = DATToChunks.GetTokensAsInt(1).First();
-
-
-
-            return gd;
-        }
+      
 
         /// <summary>
         /// Load the adventure game from the provided dat file
@@ -155,10 +52,7 @@ namespace ScottFreeLoader
         /// <returns>Game data class</returns>
         public static GameData Load(string pFile)
         {
-
             string[] directionsLong = { "North", "South", "East", "West", "Up", "Down" };
-            int VERB_TAKE = 10;
-            int VERB_DROP = 18;
 
             GameData gd = new GameData();
 
@@ -173,8 +67,6 @@ namespace ScottFreeLoader
             gd.Messages = new string[gd.Header.NumMessages];
             gd.Items = new Item[gd.Header.NumItems];
             gd.GameName = pFile;
-            gd.CurrentRoom = gd.Header.StartRoom;
-            gd.LampLife = gd.Header.LightDuration;
 
             int ctr = 0;
 
@@ -235,27 +127,7 @@ namespace ScottFreeLoader
             #region Rooms
 
             for (ctr = 0; ctr < gd.Rooms.Length; ctr++)
-            {
                 gd.Rooms[ctr] = new Room(DATToChunks.GetTokensAsInt(6), DATToChunks.getTokens(1).First());
-
-
-                gd.Rooms[ctr].Description += "\n\n" + _ObviousExits;
-
-                if (gd.Rooms[ctr].Exits.Count(e => e > 0) > 0)
-                {
-                    gd.Rooms[ctr].Description +=
-                        gd.Rooms[ctr].Exits
-                                .Select((val, ind) => new { val, ind })
-                                .Where(i => i.val > 0)
-                                .Select(i => directionsLong[i.ind])
-                                .Aggregate((current, next) => current + ", " + next);
-
-                }
-                else
-                {
-                    gd.Rooms[ctr].Description += _None; //none
-                }
-            }
 
             #endregion
 
@@ -279,48 +151,6 @@ namespace ScottFreeLoader
 
             #endregion
 
-            #region Generate get/drop actions for items that can be carried
-
-            for (int itemCtr = 0; itemCtr < gd.Items.Count(); itemCtr++)
-            {
-                if (gd.Items[itemCtr].Word != null)
-                {
-                    Actions.Add
-                        (
-                            new Action()
-                            {
-                                Comment = "Autotake for " + gd.Items[itemCtr].Description
-                                ,
-                                Verb = VERB_TAKE
-                                ,
-                                Noun = gd.Nouns.TakeWhile(nn => nn != gd.Items[itemCtr].Word).Count()
-                                ,
-                                Conditions = new int[][] { new int[] { 2, itemCtr } }
-                                ,
-                                Actions = new int[][] { new int[] { 52, itemCtr, 0 } }
-                            }
-                        );
-
-                    Actions.Add
-                        (
-                            new Action()
-                            {
-                                Comment = "Autodrop for " + gd.Items[itemCtr].Description
-                                ,
-                                Verb = VERB_DROP
-                                ,
-                                Noun = gd.Nouns.TakeWhile(nn => nn != gd.Items[itemCtr].Word).Count()
-                                ,
-                                Conditions = new int[][] { new int[] { 1, itemCtr } }
-                                ,
-                                Actions = new int[][] { new int[] { 53, itemCtr, 0 } }
-                            }
-                        );
-                }
-
-            }
-
-            #endregion
 
             //      Child action processing
 
@@ -424,87 +254,6 @@ namespace ScottFreeLoader
         #endregion
 
 
-
-        #region save game properties
-
-        public Item[] Items = null;
-        public bool[] BitFlags = new bool[32];
-        public int[] Counters = new int[32];
-        public int[] SavedRooms = new int[32];
-
-        private int _CurrentRoom;
-        public int CurrentRoom
-        {
-            get { return _CurrentRoom; }
-            set
-            {
-                _CurrentRoom = value;
-            }
-        }
-
-        private bool _takeSuccessful;
-        public bool TakeSuccessful
-        {
-            get { return _takeSuccessful; }
-            set
-            {
-                _takeSuccessful = value;
-            }
-        }
-
-        private int _currentCounter;
-        public int CurrentCounter
-        {
-            get { return _currentCounter; }
-            set
-            {
-                _currentCounter = value;
-            }
-        }
-
-        private int _lampLife;
-        public int LampLife
-        {
-            get { return _lampLife; }
-            set
-            {
-                _lampLife = value;
-            }
-        }
-
-        private string _playerNoun;
-        public string PlayerNoun
-        {
-            get { return _playerNoun; }
-            set
-            {
-                _playerNoun = value;
-            }
-        }
-
-        private int _savedRoom;
-        public int SavedRoom
-        {
-            get { return _savedRoom; }
-            set
-            {
-                _savedRoom = value;
-            }
-        }
-
-        private bool _endGame;
-        public bool EndGame
-        {
-            get { return _endGame; }
-            set
-            {
-                _endGame = value;
-            }
-        }
-
-        #endregion        
-        
-
         #region game structure classes
 
         public class GameHeader
@@ -559,7 +308,6 @@ namespace ScottFreeLoader
             public Room(int[] pExits, string pDescription)
             {
                 Description = pDescription;
-                RawDescription = pDescription;  //used for debug
                 Exits = pExits;
             }
 

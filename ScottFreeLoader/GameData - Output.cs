@@ -1,127 +1,15 @@
 ﻿using System;
-using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 
 namespace ScottFreeLoader
 {
-    /// <summary>
-    /// Contains methods for outputting a DAT file (in the ScottFree format)
-    /// </summary>
     public partial class GameData
     {
-
-        /// <summary>
-        /// Convert the game DAT file into XML
-        /// </summary>     
-        public void SaveAsUncommentedXML(string pFile)
-        {
-            DATToChunks.Load(pFile);
-
-            XElement gameData = new XElement("GameData");
-
-            string[] headerDesc =
-             { "Unknown"
-             , "NumItems"
-             , "NumActions"
-             , "NumNounVerbs"
-             , "NumRooms"
-             , "MaxCarry"
-             , "StartRoom"
-             , "TotalTreasures"
-             , "WordLength"
-             ,"LightDuration"
-             , "NumMessages"
-             ,"TreasureRoom"};
-
-
-            int[] header = DATToChunks.GetTokensAsInt(12);
-            gameData.Add
-                (
-                    new XElement("Header", header.Select((val, ind) => new XElement(String.Format("{0}", headerDesc[ind]), val)))
-                );
-
-            string[] actionsDesc = { "NounVerb", "Condition1", "Condition2", "Condition3", "Condition4", "Condition5", "Action1", "Action2", "Action3" };
-            gameData.Add
-                (
-                    new XElement("Actions",
-
-                        Enumerable.Range(0, header[2] + 1).
-                            Select(a => new XElement("Action", new XAttribute("Index", a), DATToChunks.GetTokensAsInt(8).Select((val, ind) => new XElement(String.Format("{0}", actionsDesc[ind]), val)))
-                            ))
-                );
-
-            gameData.Add
-                (
-                    new XElement("Words",
-
-                        Enumerable.Range(0, (header[3] + 1) * 2).
-                            Select(a => DATToChunks.getTokens(1).Select(val => new XElement("Word", val)))
-                            )
-                );
-
-
-            string[] roomDesc = { "North", "South", "East", "West", "Up", "Down", "Description" };
-            gameData.Add
-                (
-                    new XElement("Rooms",
-
-                        Enumerable.Range(0, header[4] + 1).
-                            Select(a =>
-                                        new XElement("Room"
-                                            , new XAttribute("Index", a)
-                                            , new object[] {
-                                             DATToChunks.getTokens(7).Select((val, ind) => new XElement(String.Format("{0}", roomDesc[ind]), val.Trim())) }
-                                             ))
-                            )
-                );
-
-
-
-            gameData.Add
-                (
-                    new XElement("Messages",
-                        Enumerable.Range(0, header[10] + 1).
-                            Select(a => new XElement("Message", new XAttribute("Index", a), DATToChunks.getTokens(1))))
-                );
-
-            string[] itemDescripion = { "Name", "Word" };
-            gameData.Add
-                (
-                    new XElement("Items",
-                        Enumerable.Range(0, header[1] + 1).
-                            Select(a => new XElement("Item",
-                                new XAttribute("Index", a),
-                                DATToChunks.getTokens(1).First().Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries)
-                                    .Select((v, i) => new XElement(itemDescripion[i], v))
-                                    , new XElement("Location", DATToChunks.GetTokensAsInt(1))
-                            )))
-                );
-
-            gameData.Add
-                (
-                    new XElement("Comments",
-
-                        Enumerable.Range(0, header[2] + 1).
-                            Select(a => new XElement("Comment", new XAttribute("Index", a), DATToChunks.getTokens(1))
-                            ))
-                );
-
-            string[] commentDesc = { "Version", "AdventureNumber", "Unkown" };
-            ; gameData.Add
-                 (
-                     new XElement("Footer", DATToChunks.getTokens(3).Select((val, ind) => new XElement(String.Format("{0}", commentDesc[ind]), val)))
-                 );
-
-            gameData.Save(GameName + ".uncommented.xml");
-
-        }
-
-        #region SaveAsCommentedXML
         /// <summary>
         /// Convert the loaded game DAT file into XML with accompanying comments
         /// </summary>
-        public void SaveAsCommentedXML()
+        public XElement XMLOutput()
         {
             XElement gameData = new XElement("GameData");
             gameData.Add(
@@ -213,6 +101,8 @@ namespace ScottFreeLoader
                 );
 
             gameData.Save(GameName + "commented.xml");
+
+            return gameData;
         }
 
         static string[] conditions = {"item arg carried"
@@ -365,119 +255,5 @@ namespace ScottFreeLoader
                 pInput = pInput.Replace(r, ' ');
             return pInput;
         }
-        #endregion
-
-        /// <summary>
-        /// Load DAT file and output with multiline comments
-        /// </summary>
-        /// <param name="pFile"></param>
-        public static void SaveAsCommentedDat(string pFile)
-        {
-
-            string outputFileName = Path.GetFileNameWithoutExtension(pFile) + "_commented" + Path.GetExtension(pFile);
-
-
-            using (StreamWriter sw = new StreamWriter(outputFileName))
-            {
-
-                DATToChunks.Load(pFile);
-
-                var header = new GameHeader(DATToChunks.GetTokensAsInt(12));
-
-                sw.WriteLine("{0} /*Unknown*/", header.Unknown);
-                sw.WriteLine("{0} /*Number of items*/", header.NumItems-1);
-                sw.WriteLine("{0} /*Number of actions*/", header.NumActions-1);
-                sw.WriteLine("{0} /*Number of Noun Verbs*/", header.NumNounVerbs-1);
-                sw.WriteLine("{0} /*Number of Rooms*/", header.NumRooms-1);
-                sw.WriteLine("{0} /*Maximum carry*/", header.MaxCarry);
-                sw.WriteLine("{0} /*Start room*/", header.StartRoom);
-                sw.WriteLine("{0} /*Total treasures*/", header.TotalTreasures);
-                sw.WriteLine("{0} /*Word length*/", header.WordLength);
-                sw.WriteLine("{0} /*Light duration*/", header.LightDuration);
-                sw.WriteLine("{0} /*Number of messages*/", header.NumMessages-1);
-                sw.WriteLine("{0} /*Treasure room*/", header.TreasureRoom);
-
-                //produces an array of arrays
-                var labels = new string[] { "/*NounVerb*/", "/*Condition1*/", "/*Condition2*/", "/*Condition3*/", "/*Condition4*/", "/*Condition5*/", "/*Actions 1 and 2*/", "/*Actions 3 and 4*/" };
-                int ctr = 1;
-                foreach (var action in
-                    Enumerable.Range(0, header.NumActions).Select(n => DATToChunks.getTokens(8).ToArray()).ToArray())
-                {
-                    sw.WriteLine("{0}\t\t\t/*Action index {1} - NounVerb*/", action.First(), ctr++);
-                    for (int a = 1; a < 8; a++)
-                        sw.WriteLine("{0}\t\t\t{1}", action[a], labels[a]);
-                }
-
-                int vb = 0, nn = 0,  j = 0;
-                foreach (var w in DATToChunks.getTokens(header.NumNounVerbs * 2))
-                {
-
-                    if (j == 0) //verb
-                    {
-                        if (!w.StartsWith("*"))
-                            vb++;
-
-                        sw.WriteLine("\"{0}\"\t\t{1}"
-                            , w
-                            , !w.StartsWith("*") ? string.Format("/*Verb index {0}*/", vb)
-                                                 : string.Format("/*synonym of verb index {0}*/", vb)
-                                                 );
-
-                    }
-                    else if (j == 1)   //noun
-                    {
-                        if (!w.StartsWith("*"))
-                            nn++;
-
-                        sw.WriteLine("\"{0}\"\t\t{1}"
-                            , w
-                            , !w.StartsWith("*") ? string.Format("/*Noun index {0}*/", nn)
-                                                 : string.Format("/*synonym of noun index {0}*/", nn)
-                                                 );
-
-                    }
-
-                    j++;
-                    if (j > 1)
-                    {
-                        j = 0;
-                    }
-
-                }
-
-                ctr = 0;
-                string[] dire = { "/*North ", "/*South ", "/*East ", "/*West ", "/*Up ", "/*Down " };
-                foreach (var room in Enumerable.Range(0, header.NumRooms).Select(n => DATToChunks.getTokens(7).ToArray()))
-                {
-
-                    for (int q = 0; q < 6; q++)
-                        sw.WriteLine("{0}\t{1}{2}*/", room[q], dire[q], room[q] == "0" ? " - not used" : " - links to room " + room[q]);
-
-                    sw.WriteLine("\"{0}\" /*Room {1} Description*/", room.Last(), ctr++);
-                }
-
-                ctr = 0;
-
-                foreach (var message in DATToChunks.getTokens(header.NumMessages))
-                    sw.WriteLine("\"{0}\" /*Message {1}*/", message, ctr++);
-
-
-                ctr = 0;
-                foreach (var item in Enumerable.Range(0, header.NumItems).Select(n => DATToChunks.getTokens(2).ToArray()))
-                    sw.WriteLine("\"{0}\" /*Item {1} Description*/ {2} /*Location*/", item.First(), ctr++, item.Last());
-
-                ctr = 0;
-                foreach (var actionMessage in DATToChunks.getTokens(header.NumActions))
-                {
-                    sw.WriteLine("\"{0}\" /*Action {1} description*/", actionMessage, ctr++);
-                }
-
-                var footer = new GameFooter(DATToChunks.GetTokensAsInt(3));
-
-                sw.WriteLine("{0} /*Version number*/", footer.Version);
-                sw.WriteLine("{0} /*Adventure number*/", footer.AdventureNumber);
-                sw.WriteLine("{0} /*Unknown*/", footer.Unknown);
-            }
-        }        
     }
 }
