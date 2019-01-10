@@ -63,7 +63,7 @@ namespace ScottFreeLoader
                         , Rooms.Select((val, ind) => new XElement("Room",
                             new object[] {
                                 new XAttribute("index", ind)
-                                , new XElement("Description", val.RawDescription)
+                                , new XElement("Description", val.Description)
                                 , val.Exits.Select((v,i)=> new XElement(directionsLong[i], v))
                             })))
 
@@ -187,7 +187,6 @@ namespace ScottFreeLoader
                     , new object[]
                     {
                         new XAttribute("index", pIndex)
-                        , pIsChild  || pAction.Children == null ? null:  new XAttribute("HasChildren", pAction.Children != null)
                         , pAction.Verb == 0 ? new XAttribute("Auto", pAction.Noun) : new XAttribute("Input", string.Format("{0} {1}", Verbs[pAction.Verb], Nouns[pAction.Noun]))
                         , new XElement("Verb", pAction.Verb)
                         , new XElement("Noun", pAction.Noun)
@@ -242,9 +241,7 @@ namespace ScottFreeLoader
 
                                     )
                         )
-                                                 , pAction.Children != null ?
-                            pAction.Children.Select((val,ind) => MakeAction(val,ind, true))
-                            : null
+
                     }
                 );
         }

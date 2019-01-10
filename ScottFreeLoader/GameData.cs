@@ -151,96 +151,7 @@ namespace ScottFreeLoader
 
             #endregion
 
-
-            //      Child action processing
-
-            //      All actions that follow an action with a component 73 are noun == 0 && verb == 0
-            //      and are the children of that action. This method moves them into a array of
-            //      their parent
-            //      e.g 157 in Adv01.dat
-            List<Action> childs = null;
-            for (int i = Actions.Count() - 1; i >= 0; i--)
-            {
-                if (Actions[i].Actions.Count(act => act[0] == 73) > 0)
-                {
-                    int j = i + 1;
-                    childs = new List<Action>();
-                    while (Actions[j].Verb == 0 && Actions[j].Noun == 0)
-                    {
-                        childs.Add(Actions[j]);
-                        j++;
-                    }
-
-                    Actions[i].Children = childs.ToArray();
-                    Actions.RemoveRange(i + 1, childs.Count());
-                }
-            }
-
-            /*
-             Claymorgue castle fix
-
-             Action 148 has no conditions and a noun and a verb of 0, 
-             and follows a user tiggered action. This particular set of 
-             conditions only occurs in Claymorgue and none of the other 13
-             adventures. I think that when this set of conditions occurs,
-             the latter action should be treated as a child of the former, 
-                and would require some special treatment when the DAT file is loaded.
-            */
-            Action ac;
-            for (var i = 1; i < Actions.Count(); i++)
-            {
-                ac = Actions[i];
-
-                if (
-                        Actions[i].Conditions.Length == 0
-                        && Actions[i].Actions.Length > 0
-                        && Actions[i].Verb == 0
-                        && Actions[i].Noun == 0
-                        && Actions[i - 1].Verb > 0
-                    )
-                {
-
-                    Actions[i - 1].Children =
-                        new Action[] { Actions[i] };
-
-                    Actions[i] = null;
-                }
-            }
-
-            //If words aren't present for SAV GAM add them
-            //for adv06, 07, 09, 10, 11, 12, 13, 14a
-            #region Add save game
-
-            if (!gd.Nouns.Contains("GAM") && !gd.Verbs.Contains("SAV"))
-            {
-
-                Array.Resize(ref gd.Nouns, gd.Nouns.Length + 1);
-                gd.Nouns[gd.Nouns.Length - 1] = "GAM";
-
-                Array.Resize(ref gd.Verbs, gd.Verbs.Length + 1);
-                gd.Verbs[gd.Verbs.Length - 1] = "SAV";
-
-                Actions.Add(
-                        new Action(
-                                new int[]
-                                {
-                                    (gd.Verbs.Length - 1) * 150     //verb
-                                    + (gd.Nouns.Length - 1)   //noun
-                                    , 0 //condition 1
-                                    , 0 //condition 2
-                                    , 0 //condition 3
-                                    , 0 //condition 4
-                                    , 0 //condition 5
-                                    , 71 * 150
-                                    , 0
-                                }
-                            )
-                    );
-
-            }
-
-            #endregion
-
+     
             gd.Actions = Actions.Where(a => a != null).ToArray();
 
             gd.Footer = new GameFooter(DATToChunks.GetTokensAsInt(3));
@@ -312,17 +223,7 @@ namespace ScottFreeLoader
             }
 
             public string Description { get; set; }
-            public string RawDescription { get; set; }
             public int[] Exits { get; private set; }
-
-            /// <summary>
-            /// Output the class as it's corresponding DAT file entry
-            /// </summary>
-            /// <returns></returns>
-            public override string ToString()
-            {
-                return string.Format("\"{0}\"\r\n{1}", Description, Exits.Select(i => i.ToString() + "\r\n"));
-            }
 
         }
 
@@ -363,10 +264,6 @@ namespace ScottFreeLoader
             /// </summary>
             public string Word { get; private set; }
 
-            public override string ToString()
-            {
-                return String.Format("\"{0}{1}\" {2}", Description, String.IsNullOrEmpty(Word) ? "" : "/" + Word + "/", OriginalLocation);
-            }
         }
 
         public class Action
@@ -468,81 +365,7 @@ namespace ScottFreeLoader
             public int[][] Conditions { get; set; }
             public int[][] Actions { get; set; }
             public string Comment { get; set; }
-            public Action[] Children { get; set; }
             List<string> Comments;
-
-            /// <summary>
-            /// Output the action as a scott free format
-            /// </summary>
-            /// <returns></returns>
-            private int[] ToDat()
-            {
-                int VN = Verb * 150 + Noun;
-
-                int[] con = Conditions
-                                .Select((val, ind) => val[0] > 0
-                                                        ? val[0] + val[1] * 20
-                                                        : 0)
-                                .ToArray();
-
-
-                int[] args = Actions
-                                .SelectMany(a => a.Skip(1))
-                                .Where(a => a > 0)
-                                .Select(a => a * 20)
-                                .ToArray();
-
-                //add the args back into the empty condition blocks
-                int argctr = 0;
-                if (args.Count(a => a > 0) > 0)
-                {
-                    for (int ctr = 0; ctr < con.Length; ctr++)
-                    {
-                        if (con[ctr] == 0)
-                        {
-                            con[ctr] = args[argctr];
-                            argctr++;
-                        }
-                        if (argctr > args.Count() - 1)
-                            break;
-                    }
-                }
-
-                int[] acts =
-                    {
-                        Actions[0][0] > 0
-                            ? Actions [0][0] * 150 + Actions[1][0]
-                            : 0
-                        ,
-
-                        Actions[2][0] > 0
-                            ? Actions [2][0] * 150 + Actions[3][0]
-                            : 0
-
-                    };
-
-                return new int[]
-                    {
-                        VN
-                        , con[0]
-                        , con[1]
-                        , con[2]
-                        , con[3]
-                        , con[4]
-                        , acts[0]
-                        , acts[1]
-
-                    };
-
-
-            }
-
-            public override string ToString()
-            {
-                return String.Join("\r\n", ToDat().Select(c => c.ToString()));
-
-            }
-
 
         }
         #endregion
